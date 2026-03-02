@@ -1,0 +1,326 @@
+package com.smartplanner.smartplanner.service;
+
+import com.smartplanner.smartplanner.dto.dashboard.*;
+import com.smartplanner.smartplanner.model.*;
+import com.smartplanner.smartplanner.repository.*;
+import com.smartplanner.smartplanner.util.WeekUtil;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.time.LocalTime;
+import java.util.*;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
+
+@Service
+public class DashboardService {
+
+    private final TaskRepository taskRepo;
+    private final CourseRepository courseRepo;
+    private final StudySessionRepository sessionRepo;
+    private final StudyScheduleRepository scheduleRepo;
+
+    public DashboardService(TaskRepository taskRepo,
+            CourseRepository courseRepo,
+            StudySessionRepository sessionRepo,
+            StudyScheduleRepository scheduleRepo) {
+        this.taskRepo = taskRepo;
+        this.courseRepo = courseRepo;
+        this.sessionRepo = sessionRepo;
+        this.scheduleRepo = scheduleRepo;
+    }
+
+    public DashboardOverviewResponse getDashboardOverview(Integer userId) {
+        LocalDate today = LocalDate.now();
+        LocalDate weekStart = WeekUtil.weekStart(today, 0);
+        LocalDate weekEnd = WeekUtil.weekEnd(weekStart);
+
+        // Task summary
+        List<Task> allTasks = taskRepo.findByUserIdOrderByDeadlineDateAsc(userId)
+                .stream()
+                .filter(this::isVisibleTask)
+                .toList();
+        int totalTasks = allTasks.size();
+        int openTasks = (int) allTasks.stream().filter(t -> "OPEN".equals(t.getStatus())).count();
+        int doneTasks = (int) allTasks.stream().filter(t -> "DONE".equals(t.getStatus())).count();
+        int overdueTasks = (int) allTasks.stream()
+                .filter(t -> "OPEN".equals(t.getStatus()) && t.getDeadlineDate().isBefore(today))
+                .count();
+
+        // Course summary
+        List<Course> allCourses = courseRepo.findByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .filter(this::isVisibleCourse)
+                .toList();
+        int totalCourses = allCourses.size();
+        int activeCourses = (int) allCourses.stream().filter(c -> "ACTIVE".equals(c.getStatus())).count();
+        int archivedCourses = (int) allCourses.stream().filter(c -> "ARCHIVED".equals(c.getStatus())).count();
+
+        // Study hours this week
+        List<StudySession> weekSessions = sessionRepo
+                .findBySchedule_User_IdAndSessionDateBetweenOrderBySessionDateAscStartTimeAsc(
+                        userId, weekStart, weekEnd);
+
+        BigDecimal plannedHours = weekSessions.stream()
+                .map(s -> BigDecimal.valueOf(s.getDurationMinutes()).divide(BigDecimal.valueOf(60), 2,
+                        RoundingMode.HALF_UP))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal actualHours = weekSessions.stream()
+                .filter(s -> s.getActualHoursLogged() != null)
+                .map(StudySession::getActualHoursLogged)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal completionRate = plannedHours.compareTo(BigDecimal.ZERO) > 0
+                ? actualHours.divide(plannedHours, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
+                : BigDecimal.ZERO;
+
+        // Study streak
+        Integer currentStreak = calculateCurrentStreak(userId);
+
+        // Upcoming deadlines count (next 7 days)
+        LocalDate sevenDaysLater = today.plusDays(7);
+        int upcomingCount = (int) allTasks.stream()
+                .filter(t -> "OPEN".equals(t.getStatus()))
+                .filter(t -> !t.getDeadlineDate().isBefore(today) && !t.getDeadlineDate().isAfter(sevenDaysLater))
+                .count();
+
+        return new DashboardOverviewResponse(
+                new DashboardOverviewResponse.TaskSummary(totalTasks, openTasks, doneTasks, overdueTasks),
+                new DashboardOverviewResponse.CourseSummary(totalCourses, activeCourses, archivedCourses),
+                new DashboardOverviewResponse.StudyHoursSummary(plannedHours, actualHours, completionRate),
+                currentStreak,
+                upcomingCount);
+    }
+
+    public ProgressMetricsResponse getProgressMetrics(Integer userId, LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            LocalDate today = LocalDate.now();
+            startDate = WeekUtil.weekStart(today, 0);
+            endDate = WeekUtil.weekEnd(startDate);
+        }
+
+        // Task completion rate
+        List<Task> tasks = taskRepo.findByUserIdOrderByDeadlineDateAsc(userId)
+                .stream()
+                .filter(this::isVisibleTask)
+                .toList();
+        int totalTasks = tasks.size();
+        int doneTasks = (int) tasks.stream().filter(t -> "DONE".equals(t.getStatus())).count();
+        BigDecimal completionRate = totalTasks > 0
+                ? BigDecimal.valueOf(doneTasks).divide(BigDecimal.valueOf(totalTasks), 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100))
+                : BigDecimal.ZERO;
+
+        // Average hours per day
+        List<StudySession> sessions = sessionRepo
+                .findBySchedule_User_IdAndSessionDateBetweenOrderBySessionDateAscStartTimeAsc(
+                        userId, startDate, endDate);
+
+        BigDecimal totalHours = sessions.stream()
+                .filter(s -> s.getActualHoursLogged() != null)
+                .map(StudySession::getActualHoursLogged)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        BigDecimal avgHoursPerDay = daysBetween > 0
+                ? totalHours.divide(BigDecimal.valueOf(daysBetween), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        // Tasks by priority
+        Map<String, Integer> tasksByPriority = tasks.stream()
+                .collect(Collectors.groupingBy(
+                        t -> t.getPriority() != null ? t.getPriority() : "MEDIUM",
+                        Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+
+        // Tasks by status
+        Map<String, Integer> tasksByStatus = tasks.stream()
+                .collect(Collectors.groupingBy(
+                        Task::getStatus,
+                        Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+
+        // Session counts
+        int totalSessions = sessions.size();
+        int completedSessions = (int) sessions.stream().filter(s -> "COMPLETED".equals(s.getStatus())).count();
+
+        return new ProgressMetricsResponse(
+                startDate,
+                endDate,
+                completionRate,
+                avgHoursPerDay,
+                tasksByPriority,
+                tasksByStatus,
+                totalSessions,
+                completedSessions);
+    }
+
+    public List<UpcomingDeadlineResponse> getUpcomingDeadlines(Integer userId, int limit) {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
+        // Use upcoming SESSIONS instead of Tasks (User request: "deadline 4 slot sắp tới")
+        List<StudySession> sessions = sessionRepo.findUpcomingSessions(userId, today, now, PageRequest.of(0, limit));
+
+        return sessions.stream()
+                .filter(this::isVisibleSession)
+                .map(s -> {
+                    int daysRemaining = (int) ChronoUnit.DAYS.between(today, s.getSessionDate());
+                    String taskTitle = s.getTask() != null ? s.getTask().getTitle() : "Tự học";
+                    String courseName = s.getCourse() != null ? s.getCourse().getName() : "Unknown";
+                    String priority = s.getTask() != null ? s.getTask().getPriority() : "MEDIUM";
+                    
+                    // If task exists, calculate completion. Else 0.
+                    BigDecimal completion = s.getTask() != null ? calculateTaskCompletion(s.getTask()) : BigDecimal.ZERO;
+
+                    return new UpcomingDeadlineResponse(
+                            s.getId(), // Using Session ID to be unique in list
+                            taskTitle,
+                            courseName,
+                            s.getSessionDate(), // Using Session Date as "Deadline"
+                            daysRemaining,
+                            priority,
+                            completion);
+                })
+                .collect(Collectors.toList());
+    }
+
+    public StudyStreakResponse getStudyStreak(Integer userId) {
+        List<LocalDate> completedDates = sessionRepo.findDistinctCompletedSessionDates(userId);
+
+        if (completedDates.isEmpty()) {
+            return new StudyStreakResponse(0, 0, 0, null);
+        }
+
+        int currentStreak = calculateCurrentStreak(userId);
+        int longestStreak = calculateLongestStreak(completedDates);
+        int totalStudyDays = completedDates.size();
+        LocalDate lastStudyDate = completedDates.isEmpty() ? null : completedDates.get(0);
+
+        return new StudyStreakResponse(currentStreak, longestStreak, totalStudyDays, lastStudyDate);
+    }
+
+    public List<CourseProgressResponse> getCourseProgress(Integer userId) {
+        List<Course> courses = courseRepo.findByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .filter(this::isVisibleCourse)
+                .toList();
+
+        return courses.stream().map(course -> {
+            List<Task> courseTasks = taskRepo.findByUserIdOrderByDeadlineDateAsc(userId).stream()
+                    .filter(this::isVisibleTask)
+                    .filter(t -> t.getCourse() != null && t.getCourse().getId().equals(course.getId()))
+                    .collect(Collectors.toList());
+
+            int totalTasks = courseTasks.size();
+            int completedTasks = (int) courseTasks.stream().filter(t -> "DONE".equals(t.getStatus())).count();
+            BigDecimal completionPercentage = totalTasks > 0
+                    ? BigDecimal.valueOf(completedTasks).divide(BigDecimal.valueOf(totalTasks), 4, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(100))
+                    : BigDecimal.ZERO;
+
+            return new CourseProgressResponse(
+                    course.getId(),
+                    course.getName(),
+                    totalTasks,
+                    completedTasks,
+                    completionPercentage,
+                    course.getStatus());
+        }).collect(Collectors.toList());
+    }
+
+    // Helper methods
+    private Integer calculateCurrentStreak(Integer userId) {
+        List<LocalDate> completedDates = sessionRepo.findDistinctCompletedSessionDates(userId);
+
+        if (completedDates.isEmpty()) {
+            return 0;
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+
+        // Logic:
+        // 1. If today has activity -> count backwards from today
+        // 2. If today no activity but yesterday has -> count backwards from yesterday
+        // 3. Else -> streak broken = 0
+
+        LocalDate checkDate;
+        if (completedDates.contains(today)) {
+            checkDate = today;
+        } else if (completedDates.contains(yesterday)) {
+            checkDate = yesterday;
+        } else {
+            return 0;
+        }
+
+        int streak = 0;
+        // Count consecutive days backwards
+        while (completedDates.contains(checkDate)) {
+            streak++;
+            checkDate = checkDate.minusDays(1);
+        }
+
+        return streak;
+    }
+
+    private boolean isVisibleSession(StudySession session) {
+        if (session == null) return false;
+        Task t = session.getTask();
+        if (t != null && "CANCELED".equalsIgnoreCase(t.getStatus())) return false;
+        Course c = session.getCourse();
+        if (c != null && Boolean.TRUE.equals(c.getIsDeleted())) return false;
+        return true;
+    }
+
+    private boolean isVisibleCourse(Course course) {
+        if (course == null) return false;
+        return !Boolean.TRUE.equals(course.getIsDeleted());
+    }
+
+    private boolean isVisibleTask(Task task) {
+        if (task == null) return false;
+        if ("CANCELED".equalsIgnoreCase(task.getStatus())) return false;
+        Course c = task.getCourse();
+        if (c != null && Boolean.TRUE.equals(c.getIsDeleted())) return false;
+        return true;
+    }
+
+    private Integer calculateLongestStreak(List<LocalDate> completedDates) {
+        if (completedDates.isEmpty()) {
+            return 0;
+        }
+
+        // Sort dates in ascending order
+        List<LocalDate> sortedDates = new ArrayList<>(completedDates);
+        Collections.sort(sortedDates);
+
+        int longestStreak = 1;
+        int currentStreak = 1;
+
+        for (int i = 1; i < sortedDates.size(); i++) {
+            if (ChronoUnit.DAYS.between(sortedDates.get(i - 1), sortedDates.get(i)) == 1) {
+                currentStreak++;
+                longestStreak = Math.max(longestStreak, currentStreak);
+            } else {
+                currentStreak = 1;
+            }
+        }
+
+        return longestStreak;
+    }
+
+    private BigDecimal calculateTaskCompletion(Task task) {
+        if (task.getEstimatedHours() == null || task.getEstimatedHours().compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal completed = task.getEstimatedHours().subtract(
+                task.getRemainingHours() != null ? task.getRemainingHours() : BigDecimal.ZERO);
+
+        return completed.divide(task.getEstimatedHours(), 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100));
+    }
+}

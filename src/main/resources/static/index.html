@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>SmartPlanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="app">
+    <header class="sp-header">
+        <div class="sp-logo">SmartPlanner</div>
+        <div class="sp-header-right">
+            <div id="header-user-pill" class="sp-badge sp-badge-neutral sp-user-badge">
+                <span class="sp-badge-label">Tài khoản</span>
+                <span id="header-user"></span>
+            </div>
+            <button id="btn-logout" class="sp-button sp-button-ghost">Logout</button>
+        </div>
+    </header>
+    <div class="d-flex">
+    <nav class="sp-nav d-flex flex-column p-3 bg-light border-end" style="min-width:240px">
+        <button data-view="dashboard" class="btn btn-light text-start mb-2 sp-nav-item sp-nav-item-active">
+            <span class="sp-nav-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4V4zm9 0h7v11h-7V4zM4 13h7v7H4v-7zm9 4h7v3h-7v-3z"/></svg>
+            </span>
+            <span class="sp-nav-label">Dashboard</span>
+        </button>
+        <button data-view="timetable" class="btn btn-light text-start mb-2 sp-nav-item">
+            <span class="sp-nav-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2V2h-2v3H9V2H7zm12 7H5v10h14V9z"/></svg>
+            </span>
+            <span class="sp-nav-label">Lịch học</span>
+        </button>
+        <button data-view="courses" class="btn btn-light text-start mb-2 sp-nav-item">
+            <span class="sp-nav-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5zm4 0h8v12H8V5z"/></svg>
+            </span>
+            <span class="sp-nav-label">Môn học</span>
+        </button>
+        <button data-view="tasks" class="btn btn-light text-start mb-2 sp-nav-item">
+            <span class="sp-nav-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l2 2 4-4 1.5 1.5L11 16 7.5 12.5 9 11zM4 5h16v2H4V5zm0 6h6v2H4v-2zm0 6h10v2H4v-2z"/></svg>
+            </span>
+            <span class="sp-nav-label">Công việc</span>
+        </button>
+    </nav>
+
+    <main class="sp-main sp-page-container flex-grow-1">
+        <section id="view-dashboard" class="sp-view sp-view-active">
+            <div class="sp-page-header">
+                <div>
+                    <h1 class="sp-page-title">Dashboard</h1>
+                    <p class="sp-page-subtitle">Tổng quan tiến độ học tập và nhiệm vụ quan trọng</p>
+                </div>
+            </div>
+            <div class="sp-grid-2">
+                <div class="sp-card helper-card hover-lift">
+                    <h2 class="sp-section-title">Need help getting started?</h2>
+                    <p class="sp-text-secondary">Xem hướng dẫn đầy đủ để cấu hình lịch và thêm công việc.</p>
+                    <div class="sp-form-actions">
+                        <button id="btn-view-guide" class="sp-button-secondary">View full guide</button>
+                        <button id="btn-ai-test-dashboard" class="sp-button-primary">Test AI Note</button>
+                    </div>
+                </div>
+                <div class="sp-card hover-lift">
+                    <h2 class="sp-section-title">Tổng quan</h2>
+                    <div id="overview-tasks" class="sp-kpi-grid"></div>
+                    <div id="overview-courses" class="sp-kpi-grid"></div>
+                    <div id="overview-hours" class="sp-kpi-grid"></div>
+                </div>
+            </div>
+
+            <div class="sp-dashboard-grid">
+                <div class="sp-card hover-lift">
+                    <h2 class="sp-section-title">Deadline sắp tới</h2>
+                    <div id="overview-deadlines" class="sp-list"></div>
+                    <div id="overview-deadlines-empty" class="sp-empty-state">
+                        <div class="sp-empty-icon">📌</div>
+                        <div class="sp-empty-title">Chưa có deadline</div>
+                        <div class="sp-empty-subtitle">Thêm công việc để hệ thống nhắc bạn đúng hạn.</div>
+                        <button class="sp-button sp-button-secondary" data-empty-action="tasks">Tạo công việc</button>
+                    </div>
+                </div>
+                <div id="guide-full" class="sp-card sp-instructions-card is-collapsed">
+                    <h2 class="sp-section-title">Cách sử dụng hệ thống</h2>
+                    <div class="sp-instruction-list">
+                        <div><strong>1)</strong> Vào <strong>Môn học</strong> để thêm môn + tổng giờ cần học.</div>
+                        <div><strong>2)</strong> Vào <strong>Công việc</strong> để thêm task theo từng môn, đặt <strong>deadline</strong> và số giờ còn lại.</div>
+                        <div><strong>3)</strong> Vào <strong>Lịch học</strong> → bấm <strong>⚙️ Cài đặt</strong> để cấu hình.</div>
+                        <div><strong>4)</strong> Trong <strong>Cấu hình chung</strong>: chọn <strong>Start/End Date</strong>, <strong>Max Hours/Day</strong>, <strong>Ngày nghỉ</strong> → bấm <strong>Lưu</strong>.</div>
+                        <div><strong>5)</strong> Trong <strong>Giờ rảnh (Availability)</strong>: thêm các khung giờ rảnh theo từng ngày → bấm <strong>Lưu Slot</strong>.</div>
+                        <div><strong>6)</strong> Quay lại Lịch học → bấm <strong>Generate timetable</strong> để tạo lịch theo giờ rảnh + deadline.</div>
+                        <div><strong>7)</strong> Đến đúng giờ học, bấm <strong>Bắt đầu</strong> để vào timer.</div>
+                        <div><strong>8)</strong> Khi xong, bấm <strong>Hoàn thành</strong>, nhập note → AI sẽ phân tích.</div>
+                        <div><strong>9)</strong> Slot <strong>COMPLETED</strong> có thể bấm <strong>View</strong> để xem lại note + AI.</div>
+                        <div><strong>10)</strong> Hệ thống hiện không còn XP/streak, tập trung vào chất lượng học.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-timetable" class="sp-view">
+            <div class="sp-page-header">
+                <div>
+                    <h1 class="sp-page-title">Lịch học</h1>
+                    <p class="sp-page-subtitle">Theo dõi lịch tuần, trạng thái và hành động nhanh</p>
+                </div>
+            </div>
+            <div class="sp-toolbar">
+                <button id="btn-week-prev" class="sp-button-secondary">&lt; Tuần trước</button>
+                <div id="week-label" class="sp-week-label"></div>
+                <button id="btn-week-next" class="sp-button-secondary">Tuần sau &gt;</button>
+                <button id="btn-generate-timetable" class="sp-button-primary">Generate timetable</button>
+                <button id="btn-open-settings" class="sp-button-secondary">⚙️ Cài đặt</button>
+                <!-- <button id="btn-sync-calendar" class="sp-button-secondary">Sync calendar</button> -->
+            </div>
+            <div id="timetable-eval" class="sp-eval-banner"></div>
+            <div id="timetable-legend" class="sp-legend">
+                <span class="sp-status-tag sp-status-pending">Planned</span>
+                <span class="sp-status-tag sp-status-focus">In Progress</span>
+                <span class="sp-status-tag sp-status-completed">Completed</span>
+                <span class="sp-status-tag sp-status-skipped">Skipped (in slot)</span>
+                <span class="sp-status-tag sp-status-missed">Missed</span>
+                <span class="sp-legend-note">Phiên bỏ lỡ sẽ được sắp lại khi bấm Generate.</span>
+            </div>
+            <div id="timetable-grid" class="sp-timetable-grid calendar-container"></div>
+
+            <!-- Settings Modal -->
+            <div id="settings-modal" class="sp-modal-overlay">
+                <div class="sp-modal-box sp-modal-large">
+                    <div class="sp-modal-header">
+                        <h2 class="sp-section-title">Cài đặt Lịch học</h2>
+                        <button id="btn-settings-close" class="sp-button-secondary">Đóng</button>
+                    </div>
+                    
+                    <div class="sp-modal-body">
+                        <!-- Sidebar Tabs -->
+                        <div class="sp-modal-sidebar">
+                            <button class="sp-tab-btn active" data-tab="general">Cấu hình chung</button>
+                            <button class="sp-tab-btn" data-tab="availability">Giờ rảnh (Availability)</button>
+                        </div>
+
+                        <!-- Content Area -->
+                        <div class="sp-modal-content">
+                            <!-- Tab General -->
+                            <div id="tab-general" class="sp-tab-content active">
+                                <h3 class="sp-section-title">Lộ trình & Giới hạn</h3>
+                                <div class="sp-form">
+                                    <label>
+                                        Ngày bắt đầu (Start Date)
+                                        <input type="date" id="pref-start-date">
+                                    </label>
+                                    <label>
+                                        Ngày kết thúc (End Date)
+                                        <input type="date" id="pref-end-date">
+                                    </label>
+                                    <label>
+                                        Giờ tối đa/ngày (Max Hours)
+                                        <input type="number" id="pref-max-hours" step="0.5" min="0.5" max="24">
+                                    </label>
+                                    <label>
+                                        Độ dài 1 slot (phút)
+                                        <select id="pref-block-minutes">
+                                            <option value="30">30 phút</option>
+                                            <option value="60">60 phút</option>
+                                            <option value="90">90 phút</option>
+                                            <option value="120">120 phút</option>
+                                        </select>
+                                    </label>
+                                    <div class="sp-form-block">
+                                        <strong>Ngày nghỉ (không học):</strong>
+                                        <div class="sp-checkbox-grid">
+                                            <label><input type="checkbox" name="pref-days" value="MON"> Thứ 2</label>
+                                            <label><input type="checkbox" name="pref-days" value="TUE"> Thứ 3</label>
+                                            <label><input type="checkbox" name="pref-days" value="WED"> Thứ 4</label>
+                                            <label><input type="checkbox" name="pref-days" value="THU"> Thứ 5</label>
+                                            <label><input type="checkbox" name="pref-days" value="FRI"> Thứ 6</label>
+                                            <label><input type="checkbox" name="pref-days" value="SAT"> Thứ 7</label>
+                                            <label><input type="checkbox" name="pref-days" value="SUN"> CN</label>
+                                        </div>
+                                    </div>
+                                    <div class="sp-form-actions sp-form-actions-lg">
+                                        <button id="btn-settings-reset" class="sp-button-secondary">Mặc định</button>
+                                        <button id="btn-settings-save" class="sp-button-primary">Lưu cấu hình</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tab Availability -->
+                            <div id="tab-availability" class="sp-tab-content">
+                                <div class="sp-toolbar">
+                                    <h3 class="sp-section-title">Danh sách giờ rảnh</h3>
+                                    <button id="btn-avail-add-new" class="sp-button-primary">+ Thêm mới</button>
+                                </div>
+                                <div id="avail-form-container" class="sp-inline-panel">
+                                    <h4 class="sp-section-title">Thêm/Sửa giờ rảnh</h4>
+                                    <form id="avail-form-modal" class="sp-form">
+                                        <input type="hidden" id="avail-id-modal">
+                                        <div class="sp-form-grid">
+                                            <label>
+                                                Thứ
+                                                <select id="avail-day-modal" required>
+                                                    <option value="1">Thứ 2</option>
+                                                    <option value="2">Thứ 3</option>
+                                                    <option value="3">Thứ 4</option>
+                                                    <option value="4">Thứ 5</option>
+                                                    <option value="5">Thứ 6</option>
+                                                    <option value="6">Thứ 7</option>
+                                                    <option value="7">Chủ nhật</option>
+                                                </select>
+                                            </label>
+                                            <label>
+                                                Trạng thái
+                                                <select id="avail-active-modal">
+                                                    <option value="true">Đang dùng</option>
+                                                    <option value="false">Tạm tắt</option>
+                                                </select>
+                                            </label>
+                                        </div>
+                                        <div class="sp-form-grid">
+                                            <label>
+                                                Bắt đầu
+                                                <input type="time" id="avail-start-modal" required>
+                                            </label>
+                                            <label>
+                                                Kết thúc
+                                                <input type="time" id="avail-end-modal" required>
+                                            </label>
+                                        </div>
+                                        <div class="sp-form-actions">
+                                            <button type="submit" class="sp-button-primary">Lưu Slot</button>
+                                            <button type="button" id="btn-avail-cancel-modal" class="sp-button-secondary">Hủy</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div id="avail-list-modal" class="sp-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Focus Timer View (Hidden by default) -->
+        <div id="view-session-timer" class="sp-session-timer-overlay">
+            <div class="sp-card sp-session-timer-card">
+                <h2 id="timer-course-name" class="sp-timer-title">Course Name</h2>
+                <h3 id="timer-task-title" class="sp-timer-subtitle">Task Title</h3>
+                
+                <div id="timer-countdown" class="sp-timer-countdown">
+                    00:00:00
+                </div>
+                
+                <div class="sp-timer-actions">
+                    <button id="btn-timer-skip" class="sp-button sp-button-secondary sp-button-danger">Dừng phiên</button>
+                    <button id="btn-timer-complete" class="sp-button sp-button-primary" disabled>Hoàn thành</button>
+                </div>
+                <p id="timer-hint" class="sp-timer-hint">Hãy tập trung! Nút hoàn thành sẽ hiện khi hết giờ.</p>
+            </div>
+        </div>
+
+        <section id="view-courses" class="sp-view">
+            <div class="sp-page-header">
+                <div>
+                    <h1 class="sp-page-title">Môn học</h1>
+                    <p class="sp-page-subtitle">Quản lý môn học, mức độ ưu tiên và tổng giờ</p>
+                </div>
+            </div>
+            <div class="sp-toolbar">
+                <h2 class="sp-section-title">Danh sách môn</h2>
+                <button id="btn-course-new" class="sp-button-primary">+ Môn mới</button>
+            </div>
+            <div id="course-form-card" class="sp-card sp-form-card">
+                <h3 id="course-form-title" class="sp-section-title">Thêm môn học</h3>
+                <form id="course-form" class="sp-form-inline">
+                    <input type="hidden" id="course-id">
+                    <label>
+                        Tên môn
+                        <input type="text" id="course-name" required>
+                    </label>
+                    <label>
+                        Độ ưu tiên
+                        <select id="course-priority">
+                            <option value="HIGH">HIGH</option>
+                            <option value="MEDIUM" selected>MEDIUM</option>
+                            <option value="LOW">LOW</option>
+                        </select>
+                    </label>
+                    <label>
+                        Deadline
+                        <input type="date" id="course-deadline">
+                    </label>
+                    <label>
+                        Tổng giờ
+                        <input type="number" step="0.25" min="0" id="course-hours" required>
+                    </label>
+                    <label id="course-status-wrapper" style="display:none">
+                        Trạng thái
+                        <select id="course-status">
+                            <option value="ACTIVE">ACTIVE</option>
+                            <option value="ARCHIVED">ARCHIVED</option>
+                        </select>
+                    </label>
+                    <div class="sp-form-actions">
+                        <button type="submit" class="sp-button-primary">Lưu</button>
+                        <button type="button" id="course-form-cancel" class="sp-button-secondary">Hủy</button>
+                    </div>
+                </form>
+                <div id="course-form-error" class="sp-error-text"></div>
+            </div>
+            <div id="courses-list" class="sp-list"></div>
+            <div id="courses-empty" class="sp-empty-state">
+                <div class="sp-empty-icon">📚</div>
+                <div class="sp-empty-title">Chưa có môn học</div>
+                <div class="sp-empty-subtitle">Thêm môn để bắt đầu lập kế hoạch học tập.</div>
+                <button class="sp-button sp-button-primary" data-empty-action="courses">Thêm môn học</button>
+            </div>
+            <!-- Course Tasks Modal -->
+            <div id="course-tasks-modal" class="sp-modal-overlay">
+                <div class="modal-box sp-modal-wide sp-modal-xl">
+                    <div class="modal-title">Công việc của môn <span id="course-tasks-title"></span></div>
+                    <div class="sp-modal-split">
+                        <div id="course-tasks-list" class="sp-list"></div>
+                        <div id="course-task-form" class="sp-form is-hidden">
+                            <input type="hidden" id="course-task-id">
+                            <label>
+                                Tiêu đề
+                                <input type="text" id="course-task-title" required>
+                            </label>
+                            <label>
+                                Loại
+                                <select id="course-task-type">
+                                    <option value="ASSIGNMENT">ASSIGNMENT</option>
+                                    <option value="QUIZ">QUIZ</option>
+                                    <option value="MIDTERM">MIDTERM</option>
+                                    <option value="FINAL">FINAL</option>
+                                    <option value="READING">READING</option>
+                                    <option value="PROJECT">PROJECT</option>
+                                    <option value="OTHER" selected>OTHER</option>
+                                </select>
+                            </label>
+                            <label>
+                                Ưu tiên
+                                <select id="course-task-priority">
+                                    <option value="HIGH">HIGH</option>
+                                    <option value="MEDIUM" selected>MEDIUM</option>
+                                    <option value="LOW">LOW</option>
+                                </select>
+                            </label>
+                            <label id="course-task-status-wrap" class="is-hidden">
+                                Trạng thái
+                                <select id="course-task-status">
+                                    <option value="OPEN">OPEN</option>
+                                    <option value="DONE">DONE</option>
+                                    <option value="CANCELED">CANCELED</option>
+                                </select>
+                            </label>
+                            <label>
+                                Deadline
+                                <input type="date" id="course-task-deadline" required>
+                            </label>
+                            <label>
+                                Giờ ước lượng
+                                <input type="number" step="0.25" min="0" id="course-task-estimated-hours" required>
+                            </label>
+                            <label id="course-task-remaining-wrap" class="is-hidden">
+                                Giờ còn lại
+                                <input type="number" step="0.25" min="0" id="course-task-remaining-hours">
+                            </label>
+                            <label>
+                                Mô tả
+                                <textarea id="course-task-description" rows="2"></textarea>
+                            </label>
+                            <div id="course-task-error" class="sp-error-text"></div>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button id="course-task-cancel" class="sp-button-secondary">Đóng</button>
+                        <button id="course-task-new" class="sp-button-primary">+ Task mới</button>
+                        <button id="course-task-save" class="sp-button-primary">Lưu</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-tasks" class="sp-view">
+            <div class="sp-page-header">
+                <div>
+                    <h1 class="sp-page-title">Công việc</h1>
+                    <p class="sp-page-subtitle">Theo dõi deadline, trạng thái và tiến độ hoàn thành</p>
+                </div>
+            </div>
+            <div class="sp-toolbar">
+                <h2 class="sp-section-title">Danh sách công việc</h2>
+            </div>
+            <div id="task-form-card" class="sp-card sp-form-card">
+                <h3 id="task-form-title" class="sp-section-title">Thêm task</h3>
+                <form id="task-form" class="sp-form-inline">
+                    <input type="hidden" id="task-id">
+                    <label>
+                        Môn (courseId)
+                        <select id="task-course-id" required>
+                            <option value="">(Chọn môn)</option>
+                        </select>
+                    </label>
+                    <label>
+                        Tiêu đề
+                        <input type="text" id="task-title" required>
+                    </label>
+                    <label>
+                        Loại
+                        <select id="task-type">
+                            <option value="ASSIGNMENT">ASSIGNMENT</option>
+                            <option value="QUIZ">QUIZ</option>
+                            <option value="MIDTERM">MIDTERM</option>
+                            <option value="FINAL">FINAL</option>
+                            <option value="READING">READING</option>
+                            <option value="PROJECT">PROJECT</option>
+                            <option value="OTHER" selected>OTHER</option>
+                        </select>
+                    </label>
+                    <label>
+                        Ưu tiên
+                        <select id="task-priority">
+                            <option value="HIGH">HIGH</option>
+                            <option value="MEDIUM" selected>MEDIUM</option>
+                            <option value="LOW">LOW</option>
+                        </select>
+                    </label>
+                    <label>
+                        Deadline
+                        <input type="date" id="task-deadline" required>
+                    </label>
+                    <label>
+                        Giờ ước lượng
+                        <input type="number" step="0.25" min="0" id="task-estimated-hours" required>
+                    </label>
+                    <label id="task-remaining-wrapper" style="display:none">
+                        Giờ còn lại
+                        <input type="number" step="0.25" min="0" id="task-remaining-hours">
+                    </label>
+                    <label id="task-status-wrapper" style="display:none">
+                        Trạng thái
+                        <select id="task-status">
+                            <option value="OPEN">OPEN</option>
+                            <option value="DONE">DONE</option>
+                            <option value="CANCELED">CANCELED</option>
+                        </select>
+                    </label>
+                    <label class="sp-form-full">
+                        Mô tả
+                        <textarea id="task-description" rows="2"></textarea>
+                    </label>
+                    <div class="sp-form-actions">
+                        <button type="submit" class="sp-button-primary">Lưu</button>
+                        <button type="button" id="task-form-cancel" class="sp-button-secondary">Hủy</button>
+                    </div>
+                </form>
+                <div id="task-form-error" class="sp-error-text"></div>
+            </div>
+            <div id="tasks-list" class="sp-list"></div>
+            <div id="tasks-empty" class="sp-empty-state">
+                <div class="sp-empty-icon">✅</div>
+                <div class="sp-empty-title">Chưa có công việc</div>
+                <div class="sp-empty-subtitle">Thêm task để lịch học tự động được tạo.</div>
+                <button class="sp-button sp-button-primary" data-empty-action="tasks">Tạo công việc</button>
+            </div>
+        </section>
+
+    </main>
+    </div>
+</div>
+
+<div id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+    <div id="toast-container"></div>
+    <div id="modal-overlay" class="sp-modal-overlay">
+        <div class="modal-box">
+            <div id="modal-title" class="modal-title"></div>
+            <div id="modal-message"></div>
+            <div class="modal-actions">
+                <button id="modal-cancel" class="sp-button-secondary">Hủy</button>
+                <button id="modal-confirm" class="sp-button-primary">OK</button>
+            </div>
+        </div>
+    </div>
+    <div id="reflection-overlay" class="sp-modal-overlay">
+        <div class="modal-box sp-modal-wide">
+            <div class="modal-title">Ghi chú sau buổi học</div>
+            <div id="reflection-form">
+                <div class="sp-reflection-grid">
+                    <label class="sp-reflection-field">
+                        Độ khó
+                        <select id="reflection-difficulty">
+                            <option value="">(Bỏ qua)</option>
+                            <option value="EASY">EASY</option>
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="HARD">HARD</option>
+                        </select>
+                    </label>
+                    <label class="sp-reflection-field">
+                        Bạn đã học được gì? (reflection)
+                        <textarea id="reflection-note" rows="5" placeholder="Ví dụ: Hôm nay mình hiểu X, còn vướng Y. Buổi sau làm bài Z."></textarea>
+                    </label>
+                </div>
+                <div class="modal-actions sp-modal-actions">
+                    <button id="reflection-cancel" class="sp-button-secondary">Hủy</button>
+                    <button id="reflection-save" class="sp-button-primary">Lưu</button>
+                </div>
+            </div>
+            <div id="reflection-loading" class="sp-reflection-loading">
+                <div class="sp-reflection-loading-row">
+                    <div class="spinner sp-spinner-sm"></div>
+                    <div>AI đang phân tích note...</div>
+                </div>
+            </div>
+            <div id="reflection-result" class="sp-reflection-result">
+                <div class="sp-reflection-result-grid">
+                    <div><strong>Note:</strong> <div id="reflection-note-view"></div></div>
+                    <div><strong>Quality score:</strong> <span id="reflection-quality"></span></div>
+                    <div><strong>Summary:</strong> <div id="reflection-summary"></div></div>
+                    <div><strong>Next action:</strong> <div id="reflection-next"></div></div>
+                    <div><strong>Revision suggestion:</strong> <div id="reflection-revision"></div></div>
+                    <div id="reflection-error" class="sp-error-text"></div>
+                </div>
+                <div class="modal-actions sp-modal-actions">
+                    <button id="reflection-close" class="sp-button-primary">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Lucide Icons for clean SaaS visuals -->
+    <script src="https://unpkg.com/lucide@latest/dist/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="/js/main.js"></script>
+</body>
+</html>

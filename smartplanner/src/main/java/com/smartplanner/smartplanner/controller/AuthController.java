@@ -1,0 +1,52 @@
+package com.smartplanner.smartplanner.controller;
+
+import com.smartplanner.smartplanner.dto.LoginRequest;
+import com.smartplanner.smartplanner.dto.RegisterRequest;
+import com.smartplanner.smartplanner.model.User;
+import com.smartplanner.smartplanner.service.AuthService;
+import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    public static final String SESSION_USER_ID = "USER_ID";
+
+    private final AuthService authService;
+
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req, HttpSession session) {
+        User u = authService.register(req);
+        session.setAttribute(SESSION_USER_ID, u.getId());
+        return ResponseEntity.ok(new ApiUser(u.getId(), u.getEmail(), u.getFullName()));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpSession session) {
+        User u = authService.login(req);
+        session.setAttribute(SESSION_USER_ID, u.getId());
+        return ResponseEntity.ok(new ApiUser(u.getId(), u.getEmail(), u.getFullName()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpSession session) {
+        session.invalidate();
+        return ResponseEntity.ok().body("Logged out");
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> me(HttpSession session) {
+        Object id = session.getAttribute(SESSION_USER_ID);
+        if (id == null) return ResponseEntity.status(401).body("Not logged in");
+        return ResponseEntity.ok().body(id);
+    }
+
+    public record ApiUser(Integer id, String email, String fullName) {}
+}
